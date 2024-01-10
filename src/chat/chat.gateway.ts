@@ -1,5 +1,7 @@
 import { Logger } from '@nestjs/common';
 import {
+  ConnectedSocket,
+  MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
   OnGatewayInit,
@@ -13,6 +15,8 @@ import { getUser } from '../../../user-rpc/src/protos/user.pb';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Message } from './entity/message.entity';
 import { Repository } from 'typeorm';
+import { Socket } from 'socket.io-client';
+import { RequestDto } from './dto/request.dto';
 
 @WebSocketGateway({
   cors: {
@@ -25,6 +29,7 @@ export class ChatGateway
 {
   private readonly logger = new Logger(ChatGateway.name);
   private connectedUsers: Map<string, string> = new Map();
+  private connectedSockets: Map<string, string> = new Map();
 
   constructor(
     @InjectRepository(Message)
@@ -42,20 +47,20 @@ export class ChatGateway
     const { sockets } = this.io.sockets;
     this.logger.log(`Client id: ${client.id} connected`);
     this.logger.debug(`Number of connected clients: ${sockets.size}`);
-
-    const token = client.handshake.auth.token.toString();
-    
+    const userId = client.handshake.auth.id;
+    const token = client.handshake.auth.token;
+ 
     try {
       const payload = await this.verifyAccessToken(token);
-      const user = payload && (await getUser({ id: payload.id }, { baseURL: 'http://localhost:8080' }));
 
-    if (!user) {
+    if (!userId || !payload) {
       client.disconnect(true);
       return;
     }
 
-    this.connectedUsers.set(client.id, user.id);
-  
+    this.connectedUsers.set(userId, client.id);
+    this.connectedSockets.set(client.id, userId)
+
     client.emit("connected clients", this.connectedUsers);
     } catch (e) {
       console.log(e);
@@ -64,40 +69,60 @@ export class ChatGateway
 
   handleDisconnect(client: any) {
     this.logger.log(`Cliend id:${client.id} disconnected`);
+    client.emit("connected clients", this.connectedUsers);
   }
 
-  @SubscribeMessage('private message')
-  async handlePrivateMessage(client: any, data: any) {
+  @SubscribeMessage('message')
+  async handlePrivateMessage(
+    client: any,
+    data: any 
+  ) {
+    const message = {
+      userId1: this.connectedSockets.get(client.id),
+      userId2: data.to,
+      message: data.message,
+    };
+    const response = await this.messageRepository.save(message);
+
+    if(this.connectedUsers.get(data.to)) {
+      client.to(this.connectedUsers.get(data.to)).emit('message', {
+        from: client.id,
+        message: data.message,
+      });
+    }
+  }
+
+  @SubscribeMessage('typing...')
+  handleTyping(
+    client,
+    data
+  ) {
     const message = {
       userId1: this.connectedUsers.get(client.id),
       userId2: this.connectedUsers.get(data.to),
       message: data.message,
     };
-    await this.messageRepository.save(message);
-
-    client.to(data.to).emit('private message', {
-      from: client.id,
-      message: data.message,
-    });
-  }
-
-  @SubscribeMessage('typing...')
-  handleTyping(client: any, data: any) {
     client.to(data.to).emit('typing...', {
       from: client.id,
-      message: 'is typing...',
+      message: message,
     });
   }
 
   @SubscribeMessage('idle')
-  handleIdleStatus(client: any, data: any) {
+  handleIdleStatus(
+    client,
+    data
+  ) {
     client.to(data.to).emit('idle', {
       from: client.id,
     });
   }
 
   @SubscribeMessage('active')
-  handleActiveStatus(client: any, data: any) {
+  handleActiveStatus(
+    client,
+    data
+  ) {
     client.to(data.to).emit('active', {
       from: client.id,
     });
