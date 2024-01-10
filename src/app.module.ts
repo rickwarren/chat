@@ -17,6 +17,7 @@ import { ChatModule } from './chat/chat.module';
       entities: [Message],
       synchronize: true,
     }),
+    TypeOrmModule.forFeature([Message]),
     ChatModule,
   ],
   controllers: [AppController],

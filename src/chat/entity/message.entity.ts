@@ -22,6 +22,9 @@ export class Message {
 
   @Column()
   message: string;
+
+  @Column({ nullable: true })
+  attachment: string;
   
   @CreateDateColumn({ type: 'timestamptz', default: () => 'NOW()' })
   createdAt: string;
