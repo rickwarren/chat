@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Delete, Put } from '@nestjs/common';
 import { AppService } from './app.service';
 import { Message } from './chat/entity/message.entity';
-import { CreateMessageDto } from './dto/create-message.dto';
+import { CreateMessageDto } from './chat/dto/create-message.dto';
 
 @Controller('messages')
 export class AppController {
