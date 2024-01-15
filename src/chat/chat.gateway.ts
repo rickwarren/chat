@@ -11,12 +11,9 @@ import {
 } from '@nestjs/websockets';
 import { Server } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
-import { getUser } from '../../../user-rpc/src/protos/user.pb';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Message } from './entity/message.entity';
 import { Repository } from 'typeorm';
-import { Socket } from 'socket.io-client';
-import { RequestDto } from './dto/request.dto';
 
 @WebSocketGateway({
   cors: {
@@ -81,6 +78,7 @@ export class ChatGateway
       userId1: this.connectedSockets.get(client.id),
       userId2: data.to,
       message: data.message,
+      status: 'unread'
     };
     const response = await this.messageRepository.save(message);
 
@@ -97,14 +95,9 @@ export class ChatGateway
     client,
     data
   ) {
-    const message = {
-      userId1: this.connectedUsers.get(client.id),
-      userId2: this.connectedUsers.get(data.to),
-      message: data.message,
-    };
     client.to(data.to).emit('typing...', {
       from: client.id,
-      message: message,
+      message: data.message,
     });
   }
 

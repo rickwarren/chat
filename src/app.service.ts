@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Message } from './chat/entity/message.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CreateMessageDto } from './dto/create-message.dto';
+import { CreateMessageDto } from './chat/dto/create-message.dto';
 
 @Injectable()
 export class AppService {
@@ -20,13 +20,13 @@ export class AppService {
   }
 
   async createMessage(message: CreateMessageDto): Promise<Message> {
-    const result = await this.messageRepository.create(message);
+    const result = await this.messageRepository.save(message);
     return result;
   }
 
   async updateMessage(message: Message): Promise<Message> {
-    const result = await this.messageRepository.save(message);
-    return result;
+    const result = await this.messageRepository.update({ id: message.id }, message);
+    return result.raw;
   }
 
   async deleteMessage(id: string): Promise<boolean> {
